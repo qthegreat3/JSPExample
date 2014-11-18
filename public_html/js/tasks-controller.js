@@ -4,11 +4,17 @@
  * and open the template in the editor.
  */
 tasksController = function(){
+        function errorLogger(errorCode, errorMessage){
+            consolge.log(errorCode+':'+errorMessage);
+        }
 	var taskPage;
 	var initialised = false;
 	
 	return {
 		init: function(page){
+                        storageEngine.init(function(){
+                            storageEngine.initObjectStore('task', function(){}, errorLogger);
+                        }, errorLogger);
 			if(!initialised){
 				taskPage = page;
 				$(taskPage).find('[required="required"]').prev('label').append('<span>*</span>').children('span').addClass('required');
@@ -40,6 +46,6 @@ tasksController = function(){
 				initialised = true;
 			}
 		}
-	}
+	};
 }();
 
