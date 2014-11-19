@@ -39,13 +39,23 @@ tasksController = function(){
 					evt.preventDefault();
 					if ($(taskPage).find('form').valid()){
 						var task = $('form').toObject();
-						$('#taskRow').tmpl(task).appendTo($('#tblTasks tbody'));
+                                                storageEngine.save('task', task, function(savedTask){
+                                                    $('#taskRow').tmpl(savedTask).appendTo($(taskPage).find('#tblTasks tbody'));
+                                                }, errorLogger);
 					}
 				});
 				
 				initialised = true;
 			}
-		}
+		},
+                
+                loadTasks : function() {
+                    storageEngine.findAll('task',  function(tasks){
+                        $.each(tasks, function(index, task){
+                            $('#taskRow').tmpl(task).appendTo($(taskPage).find('#tblTasks tbody'));
+                        });
+                    }, errorLogger);
+                }
 	};
 }();
 
