@@ -9,7 +9,58 @@ tasksController = function(){
         }
 	var taskPage;
 	var initialised = false;
+        
+        function taskCountChanged() {
+            var count = $(taskPage).find('#tblTasks tbody tr').length;            
+            $('footer').find('#taskCount').text(count);
+        }
 	
+        function clearTask(){
+            $(taskPage).find('form').fromObject({});
+        }
+        
+	function loadTask(csvTask) {
+		var tokens = $.csv.toArray(csvTask);
+		if (tokens.length == 3) {
+			var task = {};
+			task.task = tokens[0];
+			task.requiredBy = tokens[1];
+			task.category = tokens[2];
+			return task;
+		}
+		return null;
+	}
+	
+        function renderTable(){
+            $.each($(taskPage).find('#tblTasks tbody tr'), function(idx, row){
+                var due = Date.parse($(row).find('[datetime]').text());
+                if(due.compareTo(Date.today()) < 0){
+                    $(row).addClass("overdue");
+                }else if(due.compareTo((2).days().fromNow()) <= 0){
+                    $(row).addClass("warning");
+                }
+            });
+        }
+        
+        function loadFromCSV(event){
+            var reader = new FileReader();
+            reader.onload = function(evt){
+                var contents = evt.target.result;
+                var worker = new Worker('js/tasks-csvparse.js');
+                worker.addEventListener('message', function(e){
+                    var tasks = e.data;
+                    storageEngine.saveAll('task', tasks, function(){
+                        tasksController.loadTasks();
+                    }, errorLogger);
+                }, false);
+                worker.postMessage(contents);
+            };
+            reader.onerror = function(evt){
+                errorLogger('cannot_read_file', 'The file specified cannot be read');
+            };
+            reader.readAsText(event.target.files[0]);
+        }
+        
 	return {
 		init: function(page, callback){
                        if(initialised){
@@ -23,6 +74,7 @@ tasksController = function(){
 					}, errorLogger) 
 				}, errorLogger);
                                 
+                                                     
 				$(taskPage).find('[required="required"]').prev('label').append('<span>*</span>').children('span').addClass('required');
 				
 				$(taskPage).find('tbody tr:even').addClass('even');
@@ -31,18 +83,30 @@ tasksController = function(){
 					evt.preventDefault();
 					$(taskPage).find('#taskCreation').removeClass('not');
 				});
-            
-				$(taskPage).find('tbody tr').click(function(evt){
+				
+				$(taskPage).find('#tblTasks tbody').on('click', 'tr', function(evt) {
 					$(evt.target).closest('td').siblings().andSelf().toggleClass('rowHighlight');
 				});
+		
+				$('#importFile').change(loadFromCSV);
 				
 				$(taskPage).find('#tblTasks tbody').on('click', '.deleteRow', function(evt){
 		
 					storageEngine.delete('task', $(evt.target).data().taskId, function(){
                                             $(evt.target).parents('tr').remove();
-                                        }, errorLogger);
+                                            taskCountChanged();
+                                        }, errorLogger);                                       
 				});
 				
+                                $(taskPage).find('#tblTasks tbody').on('click', '.completeRow', function(evt){
+                                    storageEngine.findById('task', $(evt.target).data().taskId, function(task){
+                                        task.complete = true;
+                                        storageEngine.save('task', task, function(){
+                                            tasksController.loadTasks();
+                                        }, errorLogger);
+                                    }, errorLogger);
+                                });
+                                
 				$(taskPage).find('#tblTasks tbody').on('click', '.editRow', 
 					function(evt) { 
 						$(taskPage).find('#taskCreation').removeClass('not');
@@ -52,6 +116,11 @@ tasksController = function(){
 					}
 				);
 				
+                                $(taskPage).find('#clearTask').click(function(evt){
+                                    evt.preventDefault();
+                                    clearTask();
+                                });
+                                
 				$(taskPage).find('#saveTask').click(function(evt) {
 					evt.preventDefault();
 					if ($(taskPage).find('form').valid()){
@@ -59,7 +128,7 @@ tasksController = function(){
                                                 storageEngine.save('task', task, function(){
 							$(taskPage).find('#tblTasks tbody').empty();
 							tasksController.loadTasks();
-							$(':input').val('');
+							clearTask();
                                                     $(taskPage).find('#taskCreation').addClass('not');
                                                 }, errorLogger);
 					}
@@ -68,14 +137,22 @@ tasksController = function(){
 				initialised = true;
 			}
 		},
-                
-                loadTasks : function() {
-                    storageEngine.findAll('task',  function(tasks){
-                        $.each(tasks, function(index, task){
-                            $('#taskRow').tmpl(task).appendTo($(taskPage).find('#tblTasks tbody'));
-                        });
-                    }, errorLogger);
-                }
-	}
+		loadTasks : function() {
+			$(taskPage).find('#tblTasks tbody').empty();
+			storageEngine.findAll('task', function(tasks) {
+				tasks.sort(function(o1, o2) {
+					return Date.parse(o1.requiredBy).compareTo(Date.parse(o2.requiredBy));
+				});
+				$.each(tasks, function(index, task) {
+					if (!task.complete) {
+						task.complete = false;
+					}
+					$('#taskRow').tmpl(task).appendTo($(taskPage).find('#tblTasks tbody'));
+					taskCountChanged();
+					renderTable();
+				});
+			}, errorLogger);
+		} 
+	} 
 }();
 
