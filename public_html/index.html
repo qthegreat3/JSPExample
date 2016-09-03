@@ -15,13 +15,30 @@ and open the template in the editor.
         <script src="js/jquery.csv-0.71.js"></script>
         <script src="js/date.js"></script>
         <script src="js/tasks-controller.js"></script>
-        <meta charset="UTF-8">        
+        <meta charset="UTF-8">
+        <script>
+            $(document).ready(function(){
+            var $form = $('form');
+            $form.submit(function(){
+               $.post($(this).attr('action'), $(this).serialize(), function(response){
+                     // do something here on
+               },'json');
+               return false;
+            });
+         });
+        </script>
     </head>
     <body>
         <header>
             <span>Task list</span>
         </header>
         <main id="taskPage">
+            <form id="submitQuoteForm" action="http://localhost:8080/InspirationQuoteRestfulService/quote" method="post">
+                 Quote<br>
+                <input type="text" name="quote" value="Your Quote Here"><br>
+                <br>
+                <input type="submit" value="Submit">
+            </form>
             <section id="taskCreation" class="not">
                 <form id="taskForm">
                     <input type="hidden" name="id"/>
